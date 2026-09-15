@@ -1,0 +1,50 @@
+name: nalanetra_floodgrid
+description: "NalaNetra FloodGrid - Municipal waterlogging response system for SIH 2026"
+publish_to: 'none'
+version: 1.1.4+114
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2
+  image_picker: ^1.1.2
+  geolocator: ^14.0.2
+  flutter_map: ^8.2.1
+  latlong2: ^0.9.1
+  fl_chart: ^1.1.1
+  google_fonts: ^6.3.2
+  http: ^1.3.0
+  flutter_secure_storage: ^9.2.4
+  google_generative_ai: ^0.4.6
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: "^0.13.1"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
+    - assets/india_flood/
+    - assets/user_flood_incidents/
+    - assets/user_dispatch_floods/
+    - assets/user_municipal_notifications/
+    - assets/user_heatmap_live_feed/
+    - assets/user_verify_previews/
+    - assets/user_crew_floods/
+    - assets/user_active_job_floods/
+    - assets/crew_avatars/
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#002147"
+  adaptive_icon_foreground: "assets/logo.png"
