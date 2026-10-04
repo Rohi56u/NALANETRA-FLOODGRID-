@@ -139,7 +139,7 @@ def build():
         168,
         "Response priority / risk modules",
         [
-            "P = .30S + .20R + .15W + .15D + .10E + .10A",
+            "P / 100 = .30S + .20R + .15W + .15D + .10E + .10A",
             "Directed storage / Manning conveyance",
             "Timestamped radar and terrain modules",
         ],

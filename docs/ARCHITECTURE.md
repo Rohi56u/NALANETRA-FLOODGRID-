@@ -1,133 +1,55 @@
-# 🏛️ NalaNetra System Architecture Specification
+# NalaNetra system architecture
 
-> **SIH 2026 Problem Statement ID:** 26085  
-> **Title:** Urban Flood Nowcasting System (Drainage and Rainfall Coupling)  
-> **Sponsoring Agency:** Ministry of Earth Sciences (MoES) • NCMRWF  
-> **Target Municipality:** Municipal Corporation of Gurugram (MCG), Haryana  
-> **Status:** Proposed Architecture *(Conceptual architecture. Deployment and performance require validation).*
+![Connected architecture and integration boundaries](assets/system_architecture.svg)
 
----
+FastAPI owns canonical users, sessions, reports, incidents, jobs, evidence, audit and notification records. Flutter and the browser console share REST endpoints. SQLite provides persistent local use; deployment configuration requires PostgreSQL. The current map shows reported incident points; PostGIS schema supports spatial utilities.
 
-## 📐 End-to-End Architectural Blueprint
-
-![NalaNetra System Architecture](architecture_diagram.png)
-
----
-
-## 1. Multi-Tier Structural Breakdown
-
-NalaNetra's technical architecture is organized into four interconnected functional tiers designed for sub-second horizontal scalability, cryptographic evidence verification, and cross-departmental municipal response:
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                       USER / ACCESS LAYER                              │
-│  [Citizen Portal]   [MCG Officer Portal]   [Field Crew]  [City Dash]   │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                    APPLICATION / FRONTEND (Flutter)                    │
-│  • Hindi/English UI   • Material 3   • flutter_map GIS   • Crew Route  │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                 Report / Status
-                                    │
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                      BACKEND / API (FastAPI / Python)                  │
-│  Incident Management ➔ Officer Verification ➔ Priority Queue ➔ Dispatch│
-└───────────▲───────────────────────┬───────────────────────┬────────────┘
-            │                       │                       │
-      Risk Analysis              Dispatch            Evidence / Status
-            │                       │                       │
-┌───────────┴──────────┐ ┌──────────┴──────────┐ ┌──────────┴──────────┐
-│ INTELLIGENCE / RISK  │ │  DATA / GIS / ROUTE │ │ EVIDENCE / SECURITY │
-│ • IMD Doppler Radar  │ │ • PostgreSQL+PostGIS│ │ • Secure SHA-256    │
-│ • Cartosat DEM Data  │ │ • Flood Polygons    │ │ • GPS / Time EXIF   │
-│ • Drainage Hydraulics│ │ • Incident Records  │ │ • Photo Evidence    │
-│ • Photo Screening CV │ │ • OSRM Risk Routing │ │ • Firebase FCM Push │
-│ • P-Score Algorithm  │ │ • Closure Overlays  │ │ • Audit Log Ledger  │
-└──────────────────────┘ └─────────────────────┘ └─────────────────────┘
+```mermaid
+flowchart TD
+ Report["Citizen report + photo"] --> Review["Officer verification"]
+ Review -->|Approved| Queue["Explained priority queue"]
+ Review -->|Rejected| Rejected["Rejected report"]
+ Queue --> Dispatch["Issued crew dispatch"]
+ Dispatch --> Arrival["GPS arrival check"]
+ Arrival --> Before["Before photo"]
+ Before --> After["After photo + work note"]
+ After --> Closure["Officer closure review"]
+ Closure -->|Approve| Closed["Closed + status update"]
+ Closure -->|Rework| Before
 ```
 
----
+State sequence: `SUBMITTED → VERIFIED → DISPATCHED → ON_SITE → WORK_IN_PROGRESS → AWAITING_REVIEW → CLOSED`. Rework returns to `WORK_IN_PROGRESS` and preserves evidence/audit history. A partial unique index enforces one active job per crew. PostgreSQL row locks protect retries and assignments; production throughput is not benchmarked.
 
-## 2. Layer-by-Layer Engineering Details
+## Intake, grouping and privacy
 
-### Layer 1: User / Access Layer
-Provides targeted role-based interfaces optimized for different stakeholder operating contexts:
-- **Citizen Portal:** Accessible via Android/iOS/PWA. Offers high-contrast bilingual (Hindi/English) single-tap reporting, interactive GIS map pin dragging, 4-tier water depth selection, and 5-stage live resolution tracking.
-- **MCG Officer Portal:** Municipal desktop/tablet dashboard featuring a city-wide Leaflet/OSM GIS flood heatmap, live algorithmic priority queues, 150m spatial cluster management, and mandatory manual dispatch sign-off gates.
-- **Field Response Unit:** Rugged mobile interface for municipal pump operators and suction truck drivers. Provides turn-by-turn flood-safe bypass navigation and enforces before/after photo capture.
-- **City Dashboard:** High-level executive overview for MCG Commissioner, DDMA, and Ward Councillors, displaying real-time SLA metrics, ward-level pump allocations, and historical drainage surcharge trends.
+Citizen uploads carry original JPEG/PNG bytes, timestamp, depth tag, coordinates and source. The server decodes pixels, screens the photo, stores it privately and returns canonical IDs. A per-account retry ID prevents duplicate submission; conflicting evidence/coordinates are rejected.
 
-### Layer 2: Application / Frontend Layer (Flutter / Dart)
-- **Framework:** Flutter 3.13+ with modern Dart architecture.
-- **Design System:** Material 3 GovColors design language with high-contrast accessibility tokens for bright daylight outdoor emergency use.
-- **Mapping Engine:** `flutter_map` with Vector Tile integration for smooth rendering of Gurugram Ward 14 parcel boundaries, storm drain lines, and active waterlogging polygons.
-- **Offline Resilience:** Local SQLite / Hive cache queues reports during monsoon network blackouts and transmits automatically upon telemetry restoration.
+A 150 m/six-hour candidate search presents nearby open reports. It is not DBSCAN or automatic obstruction equivalence. An officer explicitly merges candidates; higher severity requires another review. Citizen raw intake remains owner-scoped after merging; relevant crew proof is visible to affected reporters.
 
-### Layer 3: Backend / API Layer (FastAPI / Python)
-- **High-Throughput Gateway:** Asynchronous FastAPI microservices running with Uvicorn/Gunicorn.
-- **Role-Based Access Control (RBAC):** Cryptographically signed JWT tokens segregating Citizen, MCG Officer, and Crew permissions.
-- **Pipeline Workflow:**
-  1. *Incident Management:* Ingestion, validation, and spatial indexing.
-  2. *Officer Verification:* Presenting AI photo screening inferences to human officers for administrative sign-off (no unverified autonomous machinery dispatch).
-  3. *Priority Queue:* Dynamic re-ranking powered by the P-Score formula.
-  4. *Dispatch + SLA Workflow:* Automated crew assignment with countdown timer triggers.
+## Priority and risk
 
-### Layer 4: Three Core Subsystems
+Six weights sum to one; each factor is bounded to 0–1. Responses expose contributions/source labels. Age uses server time; emergency context is a 0/1 factor. Deep-water escalation changes a response band separately from arithmetic. Unknown context is labelled explicitly.
 
-#### Subsystem A: INTELLIGENCE / FLOOD RISK (Orange Block)
-- **IMD Doppler Weather Radar Input:** Radial reflectivity from S-band radars at Aya Nagar and Palam ($Z = 200 R^{1.6}$).
-- **DEM / Terrain Data:** Cartosat 10m / SRTM elevation grids delineating flow accumulation and depression sink geometries.
-- **Drainage Graph Hydraulics:** Manning’s kinematic pipe routing ($V = \frac{1}{n} R_h^{2/3} S^{1/2}$) across Gurugram’s 8,920 stormwater conduits.
-- **Photo Screening:** OpenCV color space segmentation and MobileNet / YOLOv8 heuristics to classify depth and weed out spam images in $<1.2\text{ seconds}$.
-- **Flood-Risk Estimation & Proposed P-Score Heuristic:** Multi-variable mathematical model generating priority $P \in [0, 100]$.
+Radar conversion checks freshness and returns null rainfall for stale/missing input. A live IMD feed is not connected. The drainage experiment uses directed storage transfers and Manning-limited capacity with nonnegative storage and mass balance. It has no reverse flow, 2D spread, surveyed street depths or local calibration. The terrain utility uses a small synthetic depression grid.
 
-#### Subsystem B: DATA / GIS / ROUTING (Blue Block)
-- **PostgreSQL + PostGIS (Spatial Database):** Stores flood polygons, 12,450 manhole nodes, conduit geometries, and incident records indexed with spatial GiST R-trees (`EPSG:4326` & `EPSG:3857`).
-- **OSRM Route Calculation:** Open Source Routing Machine engine with dynamic edge exclusions. Blocks road links with water depth $>30\text{ cm}$ and reroutes municipal trucks via safe elevated corridors.
+OpenCV derives a pixel colour cue. Optional YOLO requires evaluated local weights. Neither establishes calibrated depth or scene authenticity.
 
-#### Subsystem C: EVIDENCE / NOTIFICATION / SECURITY (Green Block)
-- **Secure Storage + SHA-256 Integrity Checks:** On-device and server-side cryptographic hashing under Section 65B of the Indian Evidence Act.
-- **GPS + Timestamp Metadata:** Hardware device EXIF validation enforcing strict $\le 50\text{ meter}$ on-site geofencing.
-- **Audit Log Ledger:** Tamper-evident operational ledger tracking complaint-to-closure timestamps.
-- **Firebase FCM Push Notifications:** Low-latency push notifications alerting citizens, command officers, and field personnel.
+## Routing
 
----
+Configured OSRM supplies alternatives and full road geometry. Every segment is checked against 150 m buffers around active waist/submerged reports, including potentially provisional depth claims. Failed, unconfigured or fully intersecting alternatives give no recommendation. This post-screening does not rewrite road graph weights or establish a dry route. Updated closures and surveyed polygons require operational inputs.
 
-## 3. The 4 Key Operational Flows
+## Proof and closure
 
-```
-FLOW 1: REPORT
-[Citizen GPS / Photo Report] ──► [Photo Screening (CV)] ──► [Officer Verification] ──► [Priority Queue]
+Crew arrival/proof belongs to the assigned account, with claimed accuracy ≤50 m and distance ≤50 m. Proof must follow dispatch and be within 15 minutes; after must follow before. Identical byte/pixel evidence is rejected. After proof carries a work note.
 
-FLOW 2: DISPATCH / ROUTE
-[Officer Dispatch Sign-Off] ──► [OSRM Risk-Aware Routing] ──► [Field Response Unit]
+Closure rechecks stored SHA-256 values and needs an officer decision. Rework preserves old evidence; actors/times/transition/proof digests enter audit records. GPS/time are client assertions, not hardware attestation; database administrators can modify audit records.
 
-FLOW 3: PHOTO PROOF
-[Field Before/After Photos] ──► [Secure Storage + SHA-256] ──► [Officer Closure Verification]
+Local browser fixtures use explicitly labelled `demo-fixture` coordinates, rejected in deployment mode. The browser demo is not evidence of physical GPS/camera validation.
 
-FLOW 4: NOTIFICATION
-[FastAPI Backend Gateway] ──► [Firebase Cloud Messaging] ──► [Citizen / Officer / Crew]
-```
+## Sessions and updates
 
----
+Passwords use salted scrypt. Short-lived JWTs reference persisted revocable sessions; hashed refresh tokens rotate. Signup only grants citizen access. Verified operator-issued staff IDs, login lockout and OTP expiry/attempt/resend limits are enforced.
 
-## 4. Scientific Priority Formula (P-Score)
+Flutter secure storage holds account-scoped queue/session data. Native and browser protections differ; a trusted HTTPS origin and device review are necessary. Protected evidence requires authorization and no-store responses; account-specific image URLs avoid reuse across signed-in accounts.
 
-$$\mathbf{P = 0.30(S) + 0.20(R) + 0.15(W) + 0.15(D) + 0.10(E) + 0.10(A)}$$
-
-| Variable | Weight | Description | Operational Source / Metric |
-|:---:|:---:|:---|:---|
-| $\mathbf{S}$ | **0.30** | Ground-truth visual depth tier | Classified photo evidence: Ankle ($0.25$), Knee ($0.50$), Waist ($0.75$), Submerged ($1.00$). |
-| $\mathbf{R}$ | **0.20** | Doppler radar rainfall nowcast | Sub-kilometer intensity from Aya Nagar DWR ($Z=200R^{1.6}$) normalized against $80\text{ mm/hr}$. |
-| $\mathbf{W}$ | **0.15** | Ward Criticality Index | Population exposure, commercial significance, and traffic density per ward ($0.0\text{--}1.0$). |
-| $\mathbf{D}$ | **0.15** | Drainage Pipe Surcharge Index | Conduit hydraulic stress: ratio of inflow to Manning conveyance capacity ($Q / Q_{cap}$). |
-| $\mathbf{E}$ | **0.10** | Emergency Corridor Multiplier | $1.5\times$ priority boost for critical hospital routes (Medanta, Artemis, Civil Hospital). |
-| $\mathbf{A}$ | **0.10** | SLA Aging Accumulation Factor | Linear time penalty: $A = \min(1.0, \Delta t / 180\text{ min})$ preventing ticket stagnation. |
-
-> ⚡ **Dynamic Severity Upgrade:** If citizen visual evidence indicates waist-deep or submerged conditions while macro radar reported moderate rainfall, the engine automatically upgrades priority to **CRITICAL (<35 min municipal SLA)**.
-
----
-
-*Conceptual architecture. Deployment and performance require validation.*
+Transitions persist role-scoped notifications. Optional FCM sending distinguishes configuration, provider acceptance and failure/retry status; automatic Flutter token enrollment and device delivery checks remain pending. See [security boundaries](../SECURITY.md).
