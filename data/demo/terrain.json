@@ -1,0 +1,42 @@
+{
+  "synthetic": true,
+  "source": "Team-authored 5\u00d75 terrain fixture; no surveyed DEM",
+  "cell_size_m": 10,
+  "elevation_m": [
+    [
+      13,
+      13,
+      13,
+      13,
+      13
+    ],
+    [
+      13,
+      12,
+      11,
+      12,
+      13
+    ],
+    [
+      13,
+      11,
+      10,
+      11,
+      13
+    ],
+    [
+      13,
+      12,
+      11,
+      12,
+      13
+    ],
+    [
+      13,
+      13,
+      13,
+      13,
+      13
+    ]
+  ]
+}

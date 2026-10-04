@@ -1,0 +1,50 @@
+{
+  "synthetic": true,
+  "source": "Team-authored directed drainage fixture; no surveyed municipal assets",
+  "nodes": [
+    {
+      "id": "N1",
+      "catchment_m2": 12000,
+      "runoff_coefficient": 0.75,
+      "storage_area_m2": 1000
+    },
+    {
+      "id": "N2",
+      "catchment_m2": 6000,
+      "runoff_coefficient": 0.7,
+      "storage_area_m2": 800
+    },
+    {
+      "id": "N3",
+      "catchment_m2": 4000,
+      "runoff_coefficient": 0.65,
+      "storage_area_m2": 900
+    }
+  ],
+  "edges": [
+    {
+      "from": "N1",
+      "to": "N2",
+      "diameter_m": 0.4,
+      "slope": 0.004,
+      "roughness": 0.013,
+      "blockage": 0.65
+    },
+    {
+      "from": "N2",
+      "to": "N3",
+      "diameter_m": 0.55,
+      "slope": 0.004,
+      "roughness": 0.013,
+      "blockage": 0.3
+    },
+    {
+      "from": "N3",
+      "to": null,
+      "diameter_m": 0.7,
+      "slope": 0.005,
+      "roughness": 0.013,
+      "blockage": 0.1
+    }
+  ]
+}
