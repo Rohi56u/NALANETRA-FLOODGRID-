@@ -17,6 +17,20 @@ from scripts.bootstrap_demo import seed_accounts, DEMO_PASSWORD
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def submit_action(page, selector, endpoint, status=200):
+    """Wait for the real write acknowledgment before inspecting refreshed state."""
+    with page.expect_response(
+        lambda response: (
+            response.request.method == "POST"
+            and response.url.endswith(f"/api/v1{endpoint}")
+        )
+    ) as pending:
+        page.locator(selector).click()
+    response = pending.value
+    assert response.status == status, f"{endpoint}: {response.status} {response.text()}"
+    return response.json()
+
+
 def make_photo(path, stage):
     image = Image.new("RGB", (900, 500), (40, 55, 72))
     draw = ImageDraw.Draw(image)
@@ -80,7 +94,7 @@ def main():
                         {"officer": "MCG-OF-001", "crew": "MCG-FC-001"}.get(role, "")
                     )
                     page.locator("#login input[name=password]").fill(DEMO_PASSWORD)
-                    page.locator("#login button").click()
+                    submit_action(page, "#login button", "/auth/login")
                     page.locator("#workspace").wait_for()
                     pages[role] = page
                 citizen = pages["citizen"]
@@ -94,7 +108,15 @@ def main():
                 citizen.locator("#report textarea").fill(
                     "Synthetic demo intake; no field measurement."
                 )
-                citizen.locator("#report button").click()
+                invalid_fields = citizen.locator("#report").evaluate(
+                    "form => [...form.elements].filter(e => e.willValidate && !e.checkValidity()).map(e => ({name:e.name, error:e.validationMessage}))"
+                )
+                assert not invalid_fields, invalid_fields
+                receipt = submit_action(
+                    citizen, "#report button", "/incidents/report", 201
+                )
+                identifier = receipt["incident_id"]
+                assert receipt["report_id"] and identifier
                 citizen.locator("#detail .status").wait_for()
                 officer = pages["officer"]
                 officer.locator("#refresh").click()
@@ -107,16 +129,22 @@ def main():
                 officer.locator("#review textarea").fill(
                     "Synthetic fixture context only. Officer checks photo, depth tag and source note."
                 )
-                officer.locator("#review button").first.click()
+                submit_action(
+                    officer,
+                    "#review button:first-of-type",
+                    f"/incidents/{identifier}/review",
+                )
                 officer.locator("#dispatch").wait_for()
-                officer.locator("#dispatch button").click()
+                submit_action(
+                    officer, "#dispatch button", f"/incidents/{identifier}/dispatch"
+                )
                 officer.wait_for_function(
                     "document.querySelector('#detail .status')?.textContent==='DISPATCHED'"
                 )
                 crew = pages["crew"]
                 crew.locator("#refresh").click()
                 crew.locator("#onsite").wait_for()
-                crew.locator("#onsite").click()
+                submit_action(crew, "#onsite", f"/jobs/{identifier}/status")
                 crew.locator("#proofForm").wait_for()
                 crew.locator("#proofForm input[name=photo]").set_input_files(
                     directory / "photo-1.png"
@@ -124,7 +152,9 @@ def main():
                 crew.locator("#proofForm textarea").fill(
                     "Synthetic before-work capture."
                 )
-                crew.locator("#proofForm button").click()
+                submit_action(
+                    crew, "#proofForm button", f"/jobs/{identifier}/evidence", 201
+                )
                 crew.wait_for_function(
                     "document.querySelector('#proofForm label')?.textContent.includes('After')"
                 )
@@ -134,7 +164,9 @@ def main():
                 crew.locator("#proofForm textarea").fill(
                     "Synthetic after-cleanup capture; officer review required."
                 )
-                crew.locator("#proofForm button").click()
+                submit_action(
+                    crew, "#proofForm button", f"/jobs/{identifier}/evidence", 201
+                )
                 crew.wait_for_function(
                     "document.querySelector('#detail .status')?.textContent==='AWAITING REVIEW'"
                 )
@@ -143,7 +175,7 @@ def main():
                 officer.locator("#closureNote").fill(
                     "Compared synthetic before/after pair and recorded fixture capture metadata."
                 )
-                officer.locator("#approve").click()
+                submit_action(officer, "#approve", f"/incidents/{identifier}/closure")
                 officer.wait_for_function(
                     "document.querySelector('#detail .status')?.textContent==='CLOSED'"
                 )

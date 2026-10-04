@@ -4,7 +4,7 @@ Checks below completed during repair on **4 October 2026**. Consult the current 
 
 | Check | Result | Coverage |
 |---|---|---|
-| Python suite | 32 passed | Complete role workflow, persistence, authorization, privacy/merge, retry/receipt, OTP/session rules, proof/reuse/integrity failure paths, numerical and routing contracts |
+| Python suite | 34 passed | Complete role workflow, persistence before HTTP receipt, commit-conflict rollback, authorization, privacy/merge, retry/receipt, OTP/session rules, proof/reuse/integrity failure paths, numerical and routing contracts |
 | Flutter static analysis | No issues | Pinned dependencies and connected Dart client |
 | Flutter tests | 10 passed | REST/multipart, original queued bytes/time/owner, canonical acknowledgment, state replacement and logout |
 | Flutter release web | Passed | JavaScript build; secure-storage dependency has optional WebAssembly dry-run warnings |

@@ -22,7 +22,7 @@ State sequence: `SUBMITTED → VERIFIED → DISPATCHED → ON_SITE → WORK_IN_P
 
 ## Intake, grouping and privacy
 
-Citizen uploads carry original JPEG/PNG bytes, timestamp, depth tag, coordinates and source. The server decodes pixels, screens the photo, stores it privately and returns canonical IDs. A per-account retry ID prevents duplicate submission; conflicting evidence/coordinates are rejected.
+Citizen uploads carry original JPEG/PNG bytes, timestamp, depth tag, coordinates and source. The server decodes pixels, screens the photo, stores it privately and commits the database transaction before returning canonical IDs. Commit conflicts return an error and remove uncommitted files. A per-account retry ID prevents duplicate submission; conflicting evidence/coordinates are rejected.
 
 A 150 m/six-hour candidate search presents nearby open reports. It is not DBSCAN or automatic obstruction equivalence. An officer explicitly merges candidates; higher severity requires another review. Citizen raw intake remains owner-scoped after merging; relevant crew proof is visible to affected reporters.
 

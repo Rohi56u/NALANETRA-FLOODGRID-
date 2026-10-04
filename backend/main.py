@@ -136,6 +136,7 @@ def create_app(settings=None):
     )
 
     def get_db():
+        # Function scope commits or rolls back before an HTTP receipt is sent.
         with sessions() as db:
             db.info["new_files"] = []
             try:
@@ -151,7 +152,9 @@ def create_app(settings=None):
                     ) from None
                 raise
 
-    def current_user(db=Depends(get_db), authorization: str | None = Header(None)):
+    def current_user(
+        db=Depends(get_db, scope="function"), authorization: str | None = Header(None)
+    ):
         return authenticate(db, authorization, settings)[0]
 
     def audit(db, user, action, incident=None, **details):
@@ -328,7 +331,7 @@ def create_app(settings=None):
         return FileResponse(ROOT / "backend/web/index.html")
 
     @app.get("/api/v1/health", tags=["System"])
-    def health(db=Depends(get_db)):
+    def health(db=Depends(get_db, scope="function")):
         db.execute(text("SELECT 1"))
         return {
             "status": "ONLINE",
@@ -341,7 +344,9 @@ def create_app(settings=None):
         }
 
     @app.post("/api/v1/auth/{procedure}", tags=["Authentication"])
-    def auth_endpoint(procedure: str, data: AuthInput, db=Depends(get_db)):
+    def auth_endpoint(
+        procedure: str, data: AuthInput, db=Depends(get_db, scope="function")
+    ):
         email = data.email.strip().lower()
         if procedure == "register":
             if data.role != "citizen":
@@ -442,7 +447,9 @@ def create_app(settings=None):
         raise HTTPException(404, "Authentication operation not found")
 
     @app.post("/api/v1/auth-logout", tags=["Authentication"])
-    def logout(db=Depends(get_db), authorization: str | None = Header(None)):
+    def logout(
+        db=Depends(get_db, scope="function"), authorization: str | None = Header(None)
+    ):
         user, session = authenticate(db, authorization, settings)
         session.revoked = True
         audit(db, user, "LOGOUT")
@@ -518,7 +525,7 @@ def create_app(settings=None):
         accuracy_m: float | None = Form(None, gt=0, le=10000),
         capture_source: Literal["gps", "selected-map"] = Form("selected-map"),
         user=Depends(current_user),
-        db=Depends(get_db),
+        db=Depends(get_db, scope="function"),
     ):
         require_role(user, "citizen")
         if depth_tag.lower() not in SEVERITY_MAPPING or not location.strip():
@@ -643,7 +650,7 @@ def create_app(settings=None):
         identifier: str,
         data: ReviewInput,
         user=Depends(current_user),
-        db=Depends(get_db),
+        db=Depends(get_db, scope="function"),
     ):
         require_role(user, "officer")
         incident = incident_for(db, identifier, user, lock=True)
@@ -700,7 +707,7 @@ def create_app(settings=None):
         identifier: str,
         data: MergeInput,
         user=Depends(current_user),
-        db=Depends(get_db),
+        db=Depends(get_db, scope="function"),
     ):
         require_role(user, "officer")
         if identifier == data.target_incident_id:
@@ -765,7 +772,7 @@ def create_app(settings=None):
         identifier: str,
         data: DispatchInput,
         user=Depends(current_user),
-        db=Depends(get_db),
+        db=Depends(get_db, scope="function"),
     ):
         require_role(user, "officer")
         incident = incident_for(db, identifier, user, True)
@@ -809,7 +816,7 @@ def create_app(settings=None):
         identifier: str,
         data: StateInput,
         user=Depends(current_user),
-        db=Depends(get_db),
+        db=Depends(get_db, scope="function"),
     ):
         require_role(user, "crew")
         incident = incident_for(db, identifier, user, True)
@@ -850,7 +857,7 @@ def create_app(settings=None):
         capture_source: Literal["gps", "demo-fixture"] = Form("gps"),
         note: str = Form("", max_length=1200),
         user=Depends(current_user),
-        db=Depends(get_db),
+        db=Depends(get_db, scope="function"),
     ):
         require_role(user, "crew")
         incident = incident_for(db, identifier, user, True)
@@ -945,7 +952,7 @@ def create_app(settings=None):
         identifier: str,
         data: ClosureInput,
         user=Depends(current_user),
-        db=Depends(get_db),
+        db=Depends(get_db, scope="function"),
     ):
         require_role(user, "officer")
         incident, job = (
@@ -991,7 +998,11 @@ def create_app(settings=None):
         return serialize_incident(db, incident)
 
     @app.get("/api/v1/evidence/{identifier}", tags=["Evidence"])
-    def evidence_file(identifier: str, user=Depends(current_user), db=Depends(get_db)):
+    def evidence_file(
+        identifier: str,
+        user=Depends(current_user),
+        db=Depends(get_db, scope="function"),
+    ):
         proof = db.get(Evidence, identifier)
         if not proof:
             raise HTTPException(404, "Evidence not found")
@@ -1012,7 +1023,7 @@ def create_app(settings=None):
         )
 
     @app.get("/api/v1/snapshot", tags=["Shared state"])
-    def snapshot(user=Depends(current_user), db=Depends(get_db)):
+    def snapshot(user=Depends(current_user), db=Depends(get_db, scope="function")):
         query = select(Incident).where(Incident.status != "REJECTED")
         if user.role == "citizen":
             query = query.where(
@@ -1120,7 +1131,7 @@ def create_app(settings=None):
         }
 
     @app.get("/api/v1/incidents/heatmap", tags=["GIS"])
-    def heatmap(user=Depends(current_user), db=Depends(get_db)):
+    def heatmap(user=Depends(current_user), db=Depends(get_db, scope="function")):
         require_role(user, "officer")
         incidents = db.scalars(
             select(Incident).where(Incident.status.notin_(["CLOSED", "REJECTED"]))
@@ -1138,7 +1149,11 @@ def create_app(settings=None):
         }
 
     @app.get("/api/v1/incidents/{identifier}/audit", tags=["Evidence"])
-    def audit_history(identifier: str, user=Depends(current_user), db=Depends(get_db)):
+    def audit_history(
+        identifier: str,
+        user=Depends(current_user),
+        db=Depends(get_db, scope="function"),
+    ):
         require_role(user, "officer")
         incident_for(db, identifier, user)
         return [
@@ -1157,7 +1172,11 @@ def create_app(settings=None):
         ]
 
     @app.post("/api/v1/routes", tags=["Routing"])
-    def route(data: RouteInput, user=Depends(current_user), db=Depends(get_db)):
+    def route(
+        data: RouteInput,
+        user=Depends(current_user),
+        db=Depends(get_db, scope="function"),
+    ):
         require_role(user, "officer", "crew")
         hazards = [
             {"incident_id": i.id, "lat": i.lat, "lon": i.lon, "radius_m": 150}
@@ -1179,7 +1198,9 @@ def create_app(settings=None):
         return run_demo()
 
     @app.post("/api/v1/devices", tags=["Notifications"])
-    def device(data: dict, user=Depends(current_user), db=Depends(get_db)):
+    def device(
+        data: dict, user=Depends(current_user), db=Depends(get_db, scope="function")
+    ):
         token = data.get("token", "")
         if not isinstance(token, str) or not 20 <= len(token) <= 4096:
             raise HTTPException(422, "Invalid FCM device token")

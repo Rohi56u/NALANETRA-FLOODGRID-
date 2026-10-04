@@ -29,6 +29,6 @@ Prefix: `/api/v1`; schemas: `/docs`. Protected calls use `Authorization: Bearer 
 
 Access tokens last 30 minutes; refresh sessions last seven days and are revocable. Registration passwords need at least 12 characters.
 
-Report acknowledgments carry canonical `report_id` and `incident_id`; incomplete acknowledgments stay queued. Retry keys are per-account; conflicting retries return 409. Uploads allow 6 MiB/16 million pixels. Citizen captures must be within 24 hours; crew proof within 15 minutes, after dispatch and within mission location checks. Client metadata is not device attestation; deployment rejects `demo-fixture`.
+Report acknowledgments carry canonical `report_id` and `incident_id` after database commit; incomplete acknowledgments stay queued. Commit conflicts return 409 and roll back records and new files. Retry keys are per-account; conflicting retries return 409. Uploads allow 6 MiB/16 million pixels. Citizen captures must be within 24 hours; crew proof within 15 minutes, after dispatch and within mission location checks. Client metadata is not device attestation; deployment rejects `demo-fixture`.
 
 Surface 401/403, 409 and 422 failures rather than inventing a local success. Executable tests provide full examples.
