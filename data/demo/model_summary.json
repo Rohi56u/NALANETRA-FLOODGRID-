@@ -1,0 +1,36 @@
+{
+  "source": "Calculated from committed synthetic fixtures",
+  "horizon_minutes": 180,
+  "maximum_balance_error_m3": 5.684341886080801e-13,
+  "blocked_peak_N1_depth_m": 0.3810617427260431,
+  "clear_peak_N1_depth_m": 0.0689159454533744,
+  "illustrative_priority": {
+    "priority_score": 50.0,
+    "band": "MODERATE",
+    "action_sla_minutes": 120,
+    "factor_breakdown": {
+      "S": 0.5,
+      "R": 0.5,
+      "W": 0.5,
+      "D": 0.5,
+      "E": 1,
+      "A": 0
+    },
+    "weighted_contributions": {
+      "S": 15.0,
+      "R": 10.0,
+      "W": 7.5,
+      "D": 7.5,
+      "E": 10.0,
+      "A": 0.0
+    },
+    "dynamic_upgrade_override": false,
+    "policy_note": "No hidden score multiplier"
+  },
+  "limitations": [
+    "No local calibration",
+    "No backflow or two-dimensional flood spread",
+    "No observed ground truth",
+    "No live radar feed"
+  ]
+}

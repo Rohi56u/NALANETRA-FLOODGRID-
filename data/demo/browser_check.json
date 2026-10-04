@@ -1,0 +1,11 @@
+{
+  "source": "Synthetic local browser exercise",
+  "browser": "Chromium",
+  "roles_checked": 3,
+  "closed_incidents": 1,
+  "distinct_evidence_records": 3,
+  "page_errors": [],
+  "mobile_horizontal_overflow": false,
+  "workflow": "Citizen report \u2192 Officer review \u2192 Dispatch \u2192 GPS fixture arrival \u2192 Before/after proof \u2192 Officer closure",
+  "screenshot": "docs/assets/review_console.png"
+}
