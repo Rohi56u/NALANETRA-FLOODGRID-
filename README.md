@@ -155,3 +155,5 @@ The original logo, navy/gold identity, Poppins fonts and presentation assets are
 | `docs/slides/` | Frozen submitted PDF/images with a SHA-256 manifest |
 
 **Team Flood Busters · NalaNetra FloodGrid.** [Contributing](CONTRIBUTING.md) · [Asset attribution](NOTICE.md)
+
+<!-- build: verified-rohi56u-2026 -->
